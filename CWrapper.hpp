@@ -181,28 +181,15 @@ class __CWrapperHelper__
         using type = FALSE_TYPE;
     };
 
+    template <typename FUNCTIONS>
+    static void has_copy_helper(...) { }
 
     template <typename FUNCTIONS>
-    static void has_copy_helper(...)
-    {
-    }
-
-    template <typename FUNCTIONS>
-    static int has_copy_helper(int, decltype(FUNCTIONS::copy_func)* func = nullptr)
-    {
-        return 0;
-    }
-
-    template<typename FUNCTIONS>
-    struct has_copy
-    {
-        static constexpr bool value =
-            EQ<decltype(has_copy_helper<FUNCTIONS>(0)), int>::value;
-    };
+    static int has_copy_helper(int, decltype(FUNCTIONS::copy_func)* func = nullptr) { return 0; }
 
 public:
 
-    using type = typename COND<has_copy<F>::value,
+    using type = typename COND< EQ<decltype(has_copy_helper<F>(0)), int>::value,
         CWrapperCopiable<H, F, E>,
         CWrapperNonCopiable<H, F, E>>::type;
 };
