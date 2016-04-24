@@ -1,46 +1,53 @@
 #ifndef CWRAPPER_HPP_INCLUDED
 #define CWRAPPER_HPP_INCLUDED
 
+enum class CWrapperType
+{
+    Implicit,
+    Explicit,
+    Get,
+};
+
 template<
     typename HANDLE_T,
     typename FUNCTIONS,
     typename EXCEPTION_T = std::bad_alloc>
-class CWrapperCopiable
+class CWrapperBase
 {
 protected:
     HANDLE_T ptr;
 
 public:
 
-    explicit CWrapperCopiable(HANDLE_T ptr) :
+    explicit CWrapperBase(HANDLE_T ptr) :
         ptr{ptr}
     {
         if(ptr == nullptr)
             throw EXCEPTION_T{};
     }
 
-    CWrapperCopiable(CWrapperCopiable const& other) :
-        CWrapperCopiable{FUNCTIONS::copy_func(other.ptr)}
+    CWrapperBase(CWrapperBase const& other) :
+        CWrapperBase{FUNCTIONS::copy_func(other.ptr)}
     { }
 
     // This one is needed to prevent variadic ctor to be called
     // when you want to copy a non-const object.
-    CWrapperCopiable(CWrapperCopiable& other) :
-        CWrapperCopiable{FUNCTIONS::copy_func(other.ptr)}
+    CWrapperBase(CWrapperBase& other) :
+        CWrapperBase{FUNCTIONS::copy_func(other.ptr)}
     { }
 
     template<typename... ARGS>
-    explicit CWrapperCopiable(ARGS&&... args) :
-        CWrapperCopiable{FUNCTIONS::ctor_func(std::forward<ARGS>(args)...)}
+    explicit CWrapperBase(ARGS&&... args) :
+        CWrapperBase{FUNCTIONS::ctor_func(std::forward<ARGS>(args)...)}
     { }
 
-    CWrapperCopiable(CWrapperCopiable&& old) :
-        CWrapperCopiable{old.ptr}
+    CWrapperBase(CWrapperBase&& old) :
+        CWrapperBase{old.ptr}
     {
         old.ptr = nullptr;
     }
 
-    CWrapperCopiable& operator=(CWrapperCopiable&& old)
+    CWrapperBase& operator=(CWrapperBase&& old)
     {
         if(this != &old)
         {
@@ -51,7 +58,7 @@ public:
         return *this;
     }
 
-    ~CWrapperCopiable()
+    ~CWrapperBase()
     {
         FUNCTIONS::dtor_func(ptr);
     }
@@ -66,7 +73,7 @@ public:
         return ptr;
     }
 
-    CWrapperCopiable& operator=(CWrapperCopiable const& other)
+    CWrapperBase& operator=(CWrapperBase const& other)
     {
         if(this != &other)
         {
@@ -81,61 +88,61 @@ public:
     }
 };
 
+
 template<
     typename HANDLE_T,
     typename FUNCTIONS,
     typename EXCEPTION_T = std::bad_alloc>
-class CWrapperNonCopiable
+class CWrapperCopiable : protected CWrapperBase<HANDLE_T, FUNCTIONS, EXCEPTION_T>
 {
-
-protected:
-    HANDLE_T ptr;
+    using base = CWrapperBase<HANDLE_T, FUNCTIONS, EXCEPTION_T>;
 
 public:
 
-    explicit CWrapperNonCopiable(HANDLE_T ptr) :
-        ptr{ptr}
-    {
-        if(ptr == nullptr)
-            throw EXCEPTION_T{};
-    }
+    using base::CWrapperBase;
+    using base::operator HANDLE_T;
+    using base::operator->;
 
-    template<typename... ARGS>
-    explicit CWrapperNonCopiable(ARGS&&... args) :
-        CWrapperNonCopiable{FUNCTIONS::ctor_func(std::forward<ARGS>(args)...)}
+    CWrapperCopiable(CWrapperCopiable const& other) :
+        base{FUNCTIONS::copy_func(other.ptr)}
     { }
 
-    CWrapperNonCopiable(CWrapperNonCopiable&& old) :
-        CWrapperNonCopiable{old.ptr}
-    {
-        old.ptr = nullptr;
-    }
+    // This one is needed to prevent variadic ctor to be called
+    // when you want to copy a non-const object.
+    CWrapperCopiable(CWrapperCopiable& other) :
+        base{FUNCTIONS::copy_func(other.ptr)}
+    { }
 
-    CWrapperNonCopiable& operator=(CWrapperNonCopiable&& old)
+    CWrapperCopiable& operator=(CWrapperCopiable const& other)
     {
-        if(this != &old)
+        if(this != &other)
         {
-            FUNCTIONS::dtor_func(ptr);
-            ptr = old.ptr;
-            old.ptr = nullptr;
+            HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
+            if(new_ptr == nullptr)
+                throw EXCEPTION_T{};
+
+            FUNCTIONS::dtor_func(base::ptr);
+            base::ptr = new_ptr;
         }
         return *this;
     }
+};
 
-    ~CWrapperNonCopiable()
-    {
-        FUNCTIONS::dtor_func(ptr);
-    }
+template<
+    typename HANDLE_T,
+    typename FUNCTIONS,
+    typename EXCEPTION_T = std::bad_alloc>
+class CWrapperNonCopiable : protected CWrapperBase<HANDLE_T, FUNCTIONS, EXCEPTION_T>
+{
+    using base = CWrapperBase<HANDLE_T, FUNCTIONS, EXCEPTION_T>;
 
-    operator HANDLE_T() const
-    {
-        return ptr;
-    }
+protected:
+    HANDLE_T ptr;
+public:
 
-    HANDLE_T operator->() const
-    {
-        return ptr;
-    }
+    using base::CWrapperBase;
+    using base::operator HANDLE_T;
+    using base::operator->;
 
     // This one is needed to prevent variadic ctor to be called
     // when you want to copy a non-const object.
