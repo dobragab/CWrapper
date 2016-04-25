@@ -33,7 +33,7 @@ int main()
     using FileWrapper = CWrapper<FILE*, FileWrapperBasic>;
 
     FileWrapper file("whatever.txt", "wt");
-    fprintf(file, "Hello Unified CWrapper!");
+    fprintf(file.get(), "Hello Unified CWrapper!");
 
     FileWrapper file2(file);
     (void)file2;
