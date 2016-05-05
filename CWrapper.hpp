@@ -1,6 +1,26 @@
 #ifndef CWRAPPER_HPP_INCLUDED
 #define CWRAPPER_HPP_INCLUDED
 
+
+#define HAS_STATIC_MEMBER_DETECTOR(member)                                  \
+template<typename T>                                                        \
+class HAS_STATIC_MEMBER_DETECTOR_CLASS_ ## member                           \
+{                                                                           \
+    struct two_ints_type { int two_ints_1, two_ints_2; };                   \
+    template<typename U>                                                    \
+    static two_ints_type has_func_helper(...) { }                           \
+    template<typename U>                                                    \
+    static int has_func_helper(int, decltype(U::member)* func = nullptr)    \
+    { return 0; }                                                           \
+public:                                                                     \
+    static constexpr bool value =                                           \
+        sizeof(decltype(has_func_helper<T>(0))) == sizeof(int);             \
+}
+
+#define HAS_STATIC_MEMBER(type, member)                                     \
+    (HAS_STATIC_MEMBER_DETECTOR_CLASS_ ## member<type>::value)
+
+
 enum class CWrapperType
 {
     Implicit,
@@ -144,7 +164,7 @@ public:
     explicit CWrapperBase(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(ptr == nullptr)
+        if(!ptr)
             throw EXCEPTION_T{};
     }
 
@@ -166,7 +186,7 @@ public:
     CWrapperBase(CWrapperBase&& old) :
         CWrapperBase{old.ptr}
     {
-        old.ptr = nullptr;
+        old.ptr = 0;
     }
 
     CWrapperBase& operator=(CWrapperBase&& old)
@@ -175,7 +195,7 @@ public:
         {
             FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
-            old.ptr = nullptr;
+            old.ptr = 0;
         }
         return *this;
     }
@@ -190,7 +210,7 @@ public:
         if(this != &other)
         {
             HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
-            if(new_ptr == nullptr)
+            if(!new_ptr)
                 throw EXCEPTION_T{};
 
             FUNCTIONS::dtor_func(ptr);
@@ -227,7 +247,7 @@ public:
     explicit CWrapperNonCopiable(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(ptr == nullptr)
+        if(!ptr)
             throw EXCEPTION_T{};
     }
 
@@ -239,7 +259,7 @@ public:
     CWrapperNonCopiable(CWrapperNonCopiable&& old) :
         CWrapperNonCopiable{old.ptr}
     {
-        old.ptr = nullptr;
+        old.ptr = 0;
     }
 
     CWrapperNonCopiable& operator=(CWrapperNonCopiable&& old)
@@ -248,7 +268,7 @@ public:
         {
             FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
-            old.ptr = nullptr;
+            old.ptr = 0;
         }
         return *this;
     }
@@ -265,19 +285,6 @@ public:
     CWrapperNonCopiable& operator=(CWrapperNonCopiable const& other) = delete;
 };
 
-
-template<typename T1, typename T2>
-struct EQ
-{
-    static constexpr bool value = false;
-};
-
-template<typename T>
-struct EQ<T, T>
-{
-    static constexpr bool value = true;
-};
-
 template<bool condition, typename TRUE_TYPE, typename FALSE_TYPE>
 struct COND
 {
@@ -290,15 +297,11 @@ struct COND<false, TRUE_TYPE, FALSE_TYPE>
     using type = FALSE_TYPE;
 };
 
-template <typename FUNCTIONS>
-static void has_copy_helper(...) { }
-
-template <typename FUNCTIONS>
-static int has_copy_helper(int, decltype(FUNCTIONS::copy_func)* func = nullptr) { return 0; }
+HAS_STATIC_MEMBER_DETECTOR(copy_func);
 
 public:
 
-    using type = typename COND< EQ<decltype(has_copy_helper<F>(0)), int>::value,
+    using type = typename COND< HAS_STATIC_MEMBER(F, copy_func),
         CWrapperBase<H, F, TY, C, E>,
         CWrapperNonCopiable<H, F, TY, C, E>>::type;
 };
