@@ -20,6 +20,24 @@ public:                                                                     \
 #define HAS_STATIC_MEMBER(type, member)                                     \
     (HAS_STATIC_MEMBER_DETECTOR_CLASS_ ## member<type>::value)
 
+#define HAS_NESTED_TYPE_DETECTOR(member)                                    \
+template<typename T>                                                        \
+class HAS_NESTED_TYPE_DETECTOR_CLASS_ ## member                             \
+{                                                                           \
+    struct two_ints_type { int two_ints_1, two_ints_2; };                   \
+    template<typename U>                                                    \
+    static two_ints_type has_func_helper(...) { }                           \
+    template<typename U>                                                    \
+    static int has_func_helper(int, typename U::member* ty = nullptr)       \
+    { return 0; }                                                           \
+public:                                                                     \
+    static constexpr bool value =                                           \
+        sizeof(decltype(has_func_helper<T>(0))) == sizeof(int);             \
+}
+
+#define HAS_NESTED_TYPE(type, member)                                       \
+    (HAS_NESTED_TYPE_DETECTOR_CLASS_ ## member<type>::value)
+
 
 enum class CWrapperType
 {
@@ -32,8 +50,7 @@ template<
     typename H,
     typename F,
     CWrapperType TY,
-    bool C,
-    typename E>
+    bool C>
 class __CWrapperHelper__
 {
 
@@ -297,7 +314,22 @@ struct COND<false, TRUE_TYPE, FALSE_TYPE>
     using type = FALSE_TYPE;
 };
 
+HAS_NESTED_TYPE_DETECTOR(exception);
 HAS_STATIC_MEMBER_DETECTOR(copy_func);
+
+template<typename TYPE, typename DEFTYPE, bool>
+struct default_exception_type
+{
+    using type = DEFTYPE;
+};
+
+template<typename TYPE, typename DEFTYPE>
+struct default_exception_type<TYPE, DEFTYPE, true>
+{
+    using type = typename TYPE::exception;
+};
+
+using E = typename default_exception_type<F, std::bad_alloc, HAS_NESTED_TYPE(F, exception)>::type;
 
 public:
 
@@ -306,12 +338,13 @@ public:
         CWrapperNonCopiable<H, F, TY, C, E>>::type;
 };
 
+
+
 template<
     typename HANDLE_T,
     typename FUNCTIONS,
     CWrapperType TYPE = CWrapperType::Get,
-    bool CONSTSAFE = true,
-    typename EXCEPTION_T = std::bad_alloc>
-using CWrapper = typename __CWrapperHelper__<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T>::type;
+    bool CONSTSAFE = true>
+using CWrapper = typename __CWrapperHelper__<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE>::type;
 
 #endif // CWRAPPER_HPP_INCLUDED
