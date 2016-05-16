@@ -160,17 +160,18 @@ template<
     typename FUNCTIONS,
     CWrapperType TYPE,
     bool CONSTSAFE,
-    typename EXCEPTION_T>
+    typename EXCEPTION_T,
+    typename INVALID_T>
 class CWrapperBase
     : public ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
         TYPE,
         CONSTSAFE>
 {
     friend class ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
         TYPE,
         CONSTSAFE>;
 protected:
@@ -181,7 +182,7 @@ public:
     explicit CWrapperBase(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(!ptr)
+        if(ptr == INVALID_T::invalid_value)
             throw EXCEPTION_T{};
     }
 
@@ -203,7 +204,7 @@ public:
     CWrapperBase(CWrapperBase&& old) :
         CWrapperBase{old.ptr}
     {
-        old.ptr = 0;
+        old.ptr = INVALID_T::invalid_value;
     }
 
     CWrapperBase& operator=(CWrapperBase&& old)
@@ -212,7 +213,7 @@ public:
         {
             FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
-            old.ptr = 0;
+            old.ptr = INVALID_T::invalid_value;
         }
         return *this;
     }
@@ -227,7 +228,7 @@ public:
         if(this != &other)
         {
             HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
-            if(!new_ptr)
+            if(new_ptr == INVALID_T::invalid_value)
                 throw EXCEPTION_T{};
 
             FUNCTIONS::dtor_func(ptr);
@@ -242,17 +243,18 @@ template<
     typename FUNCTIONS,
     CWrapperType TYPE,
     bool CONSTSAFE,
-    typename EXCEPTION_T>
+    typename EXCEPTION_T,
+    typename INVALID_T>
 class CWrapperNonCopiable
     : public ConversionHandler<
         HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T>,
+        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
         TYPE,
         CONSTSAFE>
 {
     friend class ConversionHandler<
         HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T>,
+        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
         TYPE,
         CONSTSAFE>;
 
@@ -264,7 +266,7 @@ public:
     explicit CWrapperNonCopiable(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(!ptr)
+        if(ptr == INVALID_T::invalid_value)
             throw EXCEPTION_T{};
     }
 
@@ -276,7 +278,7 @@ public:
     CWrapperNonCopiable(CWrapperNonCopiable&& old) :
         CWrapperNonCopiable{old.ptr}
     {
-        old.ptr = 0;
+        old.ptr = INVALID_T::invalid_value;
     }
 
     CWrapperNonCopiable& operator=(CWrapperNonCopiable&& old)
@@ -285,7 +287,7 @@ public:
         {
             FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
-            old.ptr = 0;
+            old.ptr = INVALID_T::invalid_value;
         }
         return *this;
     }
@@ -316,6 +318,7 @@ struct COND<false, TRUE_TYPE, FALSE_TYPE>
 
 HAS_NESTED_TYPE_DETECTOR(exception);
 HAS_STATIC_MEMBER_DETECTOR(copy_func);
+HAS_STATIC_MEMBER_DETECTOR(invalid_value);
 
 template<typename TYPE, typename DEFTYPE, bool>
 struct default_exception_type
@@ -329,13 +332,27 @@ struct default_exception_type<TYPE, DEFTYPE, true>
     using type = typename TYPE::exception;
 };
 
+template<typename T>
+struct default_invalid_value
+{
+    static constexpr T invalid_value = 0;
+};
+template<typename T>
+struct default_invalid_value<T*>
+{
+    static constexpr T* invalid_value = nullptr;
+};
+
+
 using E = typename default_exception_type<F, std::bad_alloc, HAS_NESTED_TYPE(F, exception)>::type;
+using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
+    F, default_invalid_value<H>>::type;
 
 public:
 
     using type = typename COND< HAS_STATIC_MEMBER(F, copy_func),
-        CWrapperBase<H, F, TY, C, E>,
-        CWrapperNonCopiable<H, F, TY, C, E>>::type;
+        CWrapperBase<H, F, TY, C, E, D>,
+        CWrapperNonCopiable<H, F, TY, C, E, D>>::type;
 };
 
 
