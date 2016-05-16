@@ -184,7 +184,7 @@ public:
         ptr{ptr}
     {
         if(!VALIDATE_T::validate_func(ptr))
-            throw EXCEPTION_T{};
+            throw typename EXCEPTION_T::exception{};
     }
 
     CWrapperBase(CWrapperBase const& other) :
@@ -230,7 +230,7 @@ public:
         {
             HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
             if(!VALIDATE_T::validate_func(new_ptr))
-                throw EXCEPTION_T{};
+                throw typename EXCEPTION_T::exception{};
 
             FUNCTIONS::dtor_func(ptr);
             ptr = new_ptr;
@@ -269,7 +269,7 @@ public:
         ptr{ptr}
     {
         if(!VALIDATE_T::validate_func(ptr))
-            throw EXCEPTION_T{};
+            throw typename EXCEPTION_T::exception{};
     }
 
     template<typename... ARGS>
@@ -323,16 +323,9 @@ HAS_STATIC_MEMBER_DETECTOR(copy_func);
 HAS_STATIC_MEMBER_DETECTOR(invalid_value);
 HAS_STATIC_MEMBER_DETECTOR(validate_func);
 
-template<typename TYPE, typename DEFTYPE, bool>
 struct default_exception_type
 {
-    using type = DEFTYPE;
-};
-
-template<typename TYPE, typename DEFTYPE>
-struct default_exception_type<TYPE, DEFTYPE, true>
-{
-    using type = typename TYPE::exception;
+    using exception = std::bad_alloc;
 };
 
 template<typename T>
@@ -355,7 +348,8 @@ struct default_validate_func
     }
 };
 
-using E = typename default_exception_type<F, std::bad_alloc, HAS_NESTED_TYPE(F, exception)>::type;
+using E = typename COND< HAS_NESTED_TYPE(F, exception),
+    F, default_exception_type>::type;
 using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
     F, default_invalid_value<H>>::type;
 using V = typename COND< HAS_STATIC_MEMBER(F, validate_func),
