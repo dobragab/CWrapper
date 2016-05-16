@@ -161,17 +161,18 @@ template<
     CWrapperType TYPE,
     bool CONSTSAFE,
     typename EXCEPTION_T,
-    typename INVALID_T>
+    typename INVALID_T,
+    typename VALIDATE_T>
 class CWrapperBase
     : public ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
         TYPE,
         CONSTSAFE>
 {
     friend class ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
         TYPE,
         CONSTSAFE>;
 protected:
@@ -182,7 +183,7 @@ public:
     explicit CWrapperBase(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(ptr == INVALID_T::invalid_value)
+        if(!VALIDATE_T::validate_func(ptr))
             throw EXCEPTION_T{};
     }
 
@@ -228,7 +229,7 @@ public:
         if(this != &other)
         {
             HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
-            if(new_ptr == INVALID_T::invalid_value)
+            if(!VALIDATE_T::validate_func(new_ptr))
                 throw EXCEPTION_T{};
 
             FUNCTIONS::dtor_func(ptr);
@@ -244,17 +245,18 @@ template<
     CWrapperType TYPE,
     bool CONSTSAFE,
     typename EXCEPTION_T,
-    typename INVALID_T>
+    typename INVALID_T,
+    typename VALIDATE_T>
 class CWrapperNonCopiable
     : public ConversionHandler<
         HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
+        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
         TYPE,
         CONSTSAFE>
 {
     friend class ConversionHandler<
         HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T>,
+        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
         TYPE,
         CONSTSAFE>;
 
@@ -266,7 +268,7 @@ public:
     explicit CWrapperNonCopiable(HANDLE_T ptr) :
         ptr{ptr}
     {
-        if(ptr == INVALID_T::invalid_value)
+        if(!VALIDATE_T::validate_func(ptr))
             throw EXCEPTION_T{};
     }
 
@@ -319,6 +321,7 @@ struct COND<false, TRUE_TYPE, FALSE_TYPE>
 HAS_NESTED_TYPE_DETECTOR(exception);
 HAS_STATIC_MEMBER_DETECTOR(copy_func);
 HAS_STATIC_MEMBER_DETECTOR(invalid_value);
+HAS_STATIC_MEMBER_DETECTOR(validate_func);
 
 template<typename TYPE, typename DEFTYPE, bool>
 struct default_exception_type
@@ -343,16 +346,26 @@ struct default_invalid_value<T*>
     static constexpr T* invalid_value = nullptr;
 };
 
+template<typename T, typename INVALID_T>
+struct default_validate_func
+{
+    static constexpr bool validate_func(T ptr)
+    {
+        return ptr != INVALID_T::invalid_value;
+    }
+};
 
 using E = typename default_exception_type<F, std::bad_alloc, HAS_NESTED_TYPE(F, exception)>::type;
 using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
     F, default_invalid_value<H>>::type;
+using V = typename COND< HAS_STATIC_MEMBER(F, validate_func),
+    F, default_validate_func<H, D>>::type;
 
 public:
 
     using type = typename COND< HAS_STATIC_MEMBER(F, copy_func),
-        CWrapperBase<H, F, TY, C, E, D>,
-        CWrapperNonCopiable<H, F, TY, C, E, D>>::type;
+        CWrapperBase<H, F, TY, C, E, D, V>,
+        CWrapperNonCopiable<H, F, TY, C, E, D, V>>::type;
 };
 
 
