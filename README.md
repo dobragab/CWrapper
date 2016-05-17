@@ -34,33 +34,47 @@ template<
     typename HANDLE_T,
     typename FUNCTIONS,
     CWrapperType TYPE = CWrapperType::Get,
-    bool CONSTSAFE = true,
-    typename EXCEPTION_T = std::bad_alloc>
+    bool CONSTSAFE = true>
 using CWrapper = /* internal template magic */;
 ```
-### `HANDLE_T`
+#### `HANDLE_T`
 
-Type of handle to wrap, example: `FILE*`. Currently it is required that errors can be checked by:
-```C++
-if(!handle)
-    // error handling here
-```
-
-This is a huge limitation, CWrapper will be changed soon to handle various error indicating conventions.
+Type of handle to wrap, example: `FILE*`. `HANDLE_T` must be copy-constructable and copy-assignable. There must be a possible value of `HANDLE_T` indicating that the handle is invalid, for example, `nullptr` for pointers. This invalid value is customizable.
 
 If `HANDLE_T` is a pointer type, `operator->` will be generated for the wrapper.
 
-### `FUNCTIONS`
+#### `FUNCTIONS`
 
-This shall be a class that has **static** functions called `ctor_func` and `dtor_func`, these will be called in constructor and destructor. If `FUNCTIONS` has a static function called `copy_func`, CWrapper will also generate copy constructor and copy assignment operator.
+This shall be a class that has **static** functions called `ctor_func` and `dtor_func`, these will be called in constructor and destructor. If `FUNCTIONS` has a static function called `copy_func`, CWrapper will also generate copy constructor and copy assignment operator. Optionally, `invalid_value` static member, `validate_func` static function and `exception` nested type can be specified. None of these functions are allowed to throw an exception.
 
-* `ctor_func` shall return with `HANDLE_T`. It may have any parameters except `HANDLE_T`, and it may also be overloaded. It shall return `nullptr` or 0 on error.
-* `dtor_func` shall have one `HANDLE_T` parameter, its return value is discarded. It must be safe to pass `nullptr` to `dtor_func`.
-* `copy_func` shall return with `HANDLE_T` and it shall have one `const HANDLE_T` parameter. It shall return `nullptr` or 0 on error.
+However, it should be called `CONTROLLER` as this term describes its behavior better.
+
+* `invalid_value` shall be an instance of `HANDLE_T` or convertible to `HANDLE_T`. Handle is set to `invalid_value` after moving out the handle from an rvalue reference. It has a default value: `nullptr` if `HANDLE_T` is a pointer, and `0` otherwise.
+* `validate_func` shall have one `HANDLE_T` parameter. It is called after all `ctor_func` and `copy_func` calls. It shall return `true` if the handle passed as parameter is valid, `false` otherwise. It has a default value, checks if parameter is `invalid_value`.
+* `ctor_func` shall return with `HANDLE_T`. It may have any parameters except `HANDLE_T`, and it may also be overloaded. The return value will be checked with `validate_func`.
+* `dtor_func` shall have one `HANDLE_T` parameter, its return value is discarded. The function is called only if `validate_func` returned `true`. 
+* `copy_func` shall return with `HANDLE_T` and it shall have one `const HANDLE_T` parameter. The return value will be checked with `validate_func`.
+* `exception` is thrown (with its default constructor) whenever `ctor_func` or `copy_func` returns an invalid handle. Its default type is `std::bad_alloc`. 
+* This seems a bad limit that the default constructor is called, but this is more flexible than you think. Just make a custom exception type with a more informative default constructor. 
+
+Example:
+
+```C++
+class stdc_error : public std::exception
+{
+    int error_number = errno;
+public:
+    virtual const char * what() const noexcept override
+    {
+        return strerror(error_number);
+    }
+};
+```
+
 
 However, it is not required use actual functions, they can be any function objects, like `std::function`, function pointers or auto variables: `static constexpr auto ctor_func = fopen;`
 
-### `TYPE`
+#### `TYPE`
 
 Its type is `CWrapperType`:
 
@@ -78,7 +92,7 @@ enum class CWrapperType
 
 `TYPE` is `CWrapperType::Get` by default.
 
-### `CONSTSAFE`
+#### `CONSTSAFE`
 
 If `CONSTSAFE` is `true` and `HANDLE_T` is a **pointer** type, CWrapper will have two conversion operators and two `operator->`.
 
@@ -106,28 +120,6 @@ HANDLE_T get() const;
 ```
 
 `CONSTSAFE` is `true` by default.
-
-### `EXCEPTION_T`
-
-If `ctor_func` or `copy_func` returns `nullptr`, `EXCEPTION_T{}` is thrown.
-
-This seems a bad limit that its default constructor is called, but this is more flexible than you think. Just make a custom exception type with a more informative default constructor. 
-
-Example:
-
-```C++
-struct FileException : public std::runtime_error
-{
-    using std::runtime_error::runtime_error;
-    FileException() :
-        std::runtime_error{strerror(errno)} 
-    { }
-};
-```
-
-Probably `EXCEPTION_T` will be moved to `FUNCTIONS`, you might need to specify exception type as a subclass of `FUNCTIONS`.
-
-Default type is `std::bad_alloc`.
 
 ## Advanced usage
 
