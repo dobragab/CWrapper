@@ -212,7 +212,8 @@ public:
     {
         if(this != &old)
         {
-            FUNCTIONS::dtor_func(ptr);
+            if(VALIDATE_T::validate_func(ptr))
+                FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
             old.ptr = INVALID_T::invalid_value;
         }
@@ -221,7 +222,8 @@ public:
 
     ~CWrapperBase()
     {
-        FUNCTIONS::dtor_func(ptr);
+        if(VALIDATE_T::validate_func(ptr))
+            FUNCTIONS::dtor_func(ptr);
     }
 
     CWrapperBase& operator=(CWrapperBase const& other)
@@ -232,7 +234,8 @@ public:
             if(!VALIDATE_T::validate_func(new_ptr))
                 throw typename EXCEPTION_T::exception{};
 
-            FUNCTIONS::dtor_func(ptr);
+            if(VALIDATE_T::validate_func(ptr))
+                FUNCTIONS::dtor_func(ptr);
             ptr = new_ptr;
         }
         return *this;
@@ -287,7 +290,8 @@ public:
     {
         if(this != &old)
         {
-            FUNCTIONS::dtor_func(ptr);
+            if(VALIDATE_T::validate_func(ptr))
+                FUNCTIONS::dtor_func(ptr);
             ptr = old.ptr;
             old.ptr = INVALID_T::invalid_value;
         }
@@ -296,7 +300,8 @@ public:
 
     ~CWrapperNonCopiable()
     {
-        FUNCTIONS::dtor_func(ptr);
+        if(VALIDATE_T::validate_func(ptr))
+            FUNCTIONS::dtor_func(ptr);
     }
 
     // This one is needed to prevent variadic ctor to be called
