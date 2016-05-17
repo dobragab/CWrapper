@@ -376,4 +376,10 @@ template<
     bool CONSTSAFE = true>
 using CWrapper = typename __CWrapperHelper__<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE>::type;
 
+#undef HAS_STATIC_MEMBER_DETECTOR
+#undef HAS_STATIC_MEMBER
+#undef HAS_NESTED_TYPE_DETECTOR
+#undef HAS_NESTED_TYPE
+
+
 #endif // CWRAPPER_HPP_INCLUDED
