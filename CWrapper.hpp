@@ -79,7 +79,7 @@ struct ArrowHandler<PTR_T*, BASE, true>
     PTR_T* operator->()
     {   return static_cast<BASE*>(this)->ptr; }
     PTR_T const* operator->() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 
 
@@ -99,7 +99,7 @@ struct ConversionHandler<HANDLE_T, BASE, CWrapperType::Implicit, CONSTSAFE>
     : public ArrowHandler<HANDLE_T, BASE, CONSTSAFE>
 {
     operator HANDLE_T() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 template<
     typename HANDLE_T,
@@ -109,7 +109,7 @@ struct ConversionHandler<HANDLE_T, BASE, CWrapperType::Explicit, CONSTSAFE>
     : public ArrowHandler<HANDLE_T, BASE, CONSTSAFE>
 {
     explicit operator HANDLE_T() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 template<
     typename HANDLE_T,
@@ -119,7 +119,7 @@ struct ConversionHandler<HANDLE_T, BASE, CWrapperType::Get, CONSTSAFE>
     : public ArrowHandler<HANDLE_T, BASE, CONSTSAFE>
 {
     HANDLE_T get() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 
 template<
@@ -131,7 +131,7 @@ struct ConversionHandler<PTR_T*, BASE, CWrapperType::Implicit, true>
     operator PTR_T*()
     {   return static_cast<BASE*>(this)->ptr; }
     operator PTR_T const*() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 template<
     typename PTR_T,
@@ -142,7 +142,7 @@ struct ConversionHandler<PTR_T*, BASE, CWrapperType::Explicit, true>
     explicit operator PTR_T*()
     {   return static_cast<BASE*>(this)->ptr; }
     explicit operator PTR_T const*() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 template<
     typename PTR_T,
@@ -153,7 +153,7 @@ struct ConversionHandler<PTR_T*, BASE, CWrapperType::Get, true>
     PTR_T* get()
     {   return static_cast<BASE*>(this)->ptr; }
     PTR_T const* get() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 
 template<
