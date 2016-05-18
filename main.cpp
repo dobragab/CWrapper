@@ -25,13 +25,14 @@ struct FileWrapperBasic
 {
     static constexpr auto ctor_func = fopen;
     static constexpr auto dtor_func = fclose;
-
 };
 
 // This class shows the flexibility of CWrapper,
 // using all the features of controller class.
-struct FileWrapperAdvanced
+class FileWrapperAdvanced
 {
+    friend CWrapperFriend<FILE*, FileWrapperAdvanced>;
+
     static FILE* ctor_func(const char* filename)
     {
         return fopen(filename, "rt");
@@ -45,8 +46,9 @@ struct FileWrapperAdvanced
 //    static constexpr auto copy_func = copy_file;
     using exception = stdc_error;
     static constexpr FILE* invalid_value = nullptr;
-    static constexpr bool validate_func(FILE* ptr)
+    static bool validate_func(FILE* ptr)
     {
+        std::cout << "Validating" << std::endl;
         return ptr != nullptr;
     }
 };

@@ -49,9 +49,9 @@ enum class CWrapperType
 template<
     typename H,
     typename F,
-    CWrapperType TY,
-    bool C>
-class __CWrapperHelper__
+    CWrapperType TY = CWrapperType::Get,
+    bool C = true>
+class CWrapperFriend
 {
 
 template<
@@ -374,7 +374,7 @@ template<
     typename FUNCTIONS,
     CWrapperType TYPE = CWrapperType::Get,
     bool CONSTSAFE = true>
-using CWrapper = typename __CWrapperHelper__<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE>::type;
+using CWrapper = typename CWrapperFriend<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE>::type;
 
 #undef HAS_STATIC_MEMBER_DETECTOR
 #undef HAS_STATIC_MEMBER
