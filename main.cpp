@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include "CWrapper.hpp"
+using namespace CW;
 
 class stdc_error : public std::exception
 {

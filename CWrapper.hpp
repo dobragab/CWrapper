@@ -38,6 +38,7 @@ public:                                                                     \
 #define HAS_NESTED_TYPE(type, member)                                       \
     (HAS_NESTED_TYPE_DETECTOR_CLASS_ ## member<type>::value)
 
+namespace CW {
 
 enum class CWrapperType
 {
@@ -375,6 +376,8 @@ template<
     CWrapperType TYPE = CWrapperType::Get,
     bool CONSTSAFE = true>
 using CWrapper = typename CWrapperFriend<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE>::type;
+
+}
 
 #undef HAS_STATIC_MEMBER_DETECTOR
 #undef HAS_STATIC_MEMBER
