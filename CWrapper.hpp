@@ -1,6 +1,8 @@
 #ifndef CWRAPPER_HPP_INCLUDED
 #define CWRAPPER_HPP_INCLUDED
 
+#include <utility>
+#include <new> // this one is needed only for std::bad_alloc
 
 #define HAS_STATIC_MEMBER_DETECTOR(member)                                  \
 template<typename T>                                                        \
@@ -156,6 +158,24 @@ struct ConversionHandler<PTR_T*, BASE, CWrapperType::Get, true>
     {   return static_cast<const BASE*>(this)->ptr; }
 };
 
+template<bool b, typename T>
+struct hider
+{
+    static constexpr bool value = b;
+};
+
+// Works exactly like std::enable if. I didn't want to include
+// type_traits for this one and COND
+template<bool cond, typename T = void>
+struct enabler
+{ };
+
+template<typename T>
+struct enabler<true, T>
+{
+    using type = T;
+};
+
 template<
     typename HANDLE_T,
     typename FUNCTIONS,
@@ -163,21 +183,40 @@ template<
     bool CONSTSAFE,
     typename EXCEPTION_T,
     typename INVALID_T,
-    typename VALIDATE_T>
+    typename VALIDATE_T,
+    typename COPY_T,
+    bool HAS_COPY>
 class CWrapperBase
     : public ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T,
+                     INVALID_T, VALIDATE_T, COPY_T, HAS_COPY>,
         TYPE,
         CONSTSAFE>
 {
     friend class ConversionHandler<
         HANDLE_T,
-        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
+        CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T,
+                     INVALID_T, VALIDATE_T, COPY_T, HAS_COPY>,
         TYPE,
         CONSTSAFE>;
 protected:
     HANDLE_T ptr;
+
+private:
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
+    CWrapperBase(CWrapperBase const& other, void ** ptr = nullptr) :
+        CWrapperBase{COPY_T::copy_func(other.ptr)}
+    { }
+
+    // This one is needed to prevent variadic ctor to be
+    // called when you want to copy a non-const object.
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
+    CWrapperBase(CWrapperBase& other, void ** ptr = nullptr) :
+        CWrapperBase{COPY_T::copy_func(other.ptr)}
+    { }
 
 public:
 
@@ -188,14 +227,18 @@ public:
             throw typename EXCEPTION_T::exception{};
     }
 
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<HAS_COPY, DUMMY>::value>::type>
     CWrapperBase(CWrapperBase const& other) :
-        CWrapperBase{FUNCTIONS::copy_func(other.ptr)}
+        CWrapperBase{COPY_T::copy_func(other.ptr)}
     { }
 
-    // This one is needed to prevent variadic ctor to be called
-    // when you want to copy a non-const object.
+    // This one is needed to prevent variadic ctor to be
+    // called when you want to copy a non-const object.
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<HAS_COPY, DUMMY>::value>::type>
     CWrapperBase(CWrapperBase& other) :
-        CWrapperBase{FUNCTIONS::copy_func(other.ptr)}
+        CWrapperBase{COPY_T::copy_func(other.ptr)}
     { }
 
     template<typename... ARGS>
@@ -209,107 +252,17 @@ public:
         old.ptr = INVALID_T::invalid_value;
     }
 
-    CWrapperBase& operator=(CWrapperBase&& old)
-    {
-        if(this != &old)
-        {
-            if(VALIDATE_T::validate_func(ptr))
-                FUNCTIONS::dtor_func(ptr);
-            ptr = old.ptr;
-            old.ptr = INVALID_T::invalid_value;
-        }
-        return *this;
-    }
-
     ~CWrapperBase()
     {
         if(VALIDATE_T::validate_func(ptr))
             FUNCTIONS::dtor_func(ptr);
     }
 
-    CWrapperBase& operator=(CWrapperBase const& other)
+    CWrapperBase& operator=(CWrapperBase other)
     {
-        if(this != &other)
-        {
-            HANDLE_T new_ptr = FUNCTIONS::copy_func(other.ptr);
-            if(!VALIDATE_T::validate_func(new_ptr))
-                throw typename EXCEPTION_T::exception{};
-
-            if(VALIDATE_T::validate_func(ptr))
-                FUNCTIONS::dtor_func(ptr);
-            ptr = new_ptr;
-        }
+        std::swap(ptr, other.ptr);
         return *this;
     }
-};
-
-template<
-    typename HANDLE_T,
-    typename FUNCTIONS,
-    CWrapperType TYPE,
-    bool CONSTSAFE,
-    typename EXCEPTION_T,
-    typename INVALID_T,
-    typename VALIDATE_T>
-class CWrapperNonCopiable
-    : public ConversionHandler<
-        HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
-        TYPE,
-        CONSTSAFE>
-{
-    friend class ConversionHandler<
-        HANDLE_T,
-        CWrapperNonCopiable<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T, INVALID_T, VALIDATE_T>,
-        TYPE,
-        CONSTSAFE>;
-
-protected:
-    HANDLE_T ptr;
-
-public:
-
-    explicit CWrapperNonCopiable(HANDLE_T ptr) :
-        ptr{ptr}
-    {
-        if(!VALIDATE_T::validate_func(ptr))
-            throw typename EXCEPTION_T::exception{};
-    }
-
-    template<typename... ARGS>
-    explicit CWrapperNonCopiable(ARGS&&... args) :
-        CWrapperNonCopiable{FUNCTIONS::ctor_func(std::forward<ARGS>(args)...)}
-    { }
-
-    CWrapperNonCopiable(CWrapperNonCopiable&& old) :
-        CWrapperNonCopiable{old.ptr}
-    {
-        old.ptr = INVALID_T::invalid_value;
-    }
-
-    CWrapperNonCopiable& operator=(CWrapperNonCopiable&& old)
-    {
-        if(this != &old)
-        {
-            if(VALIDATE_T::validate_func(ptr))
-                FUNCTIONS::dtor_func(ptr);
-            ptr = old.ptr;
-            old.ptr = INVALID_T::invalid_value;
-        }
-        return *this;
-    }
-
-    ~CWrapperNonCopiable()
-    {
-        if(VALIDATE_T::validate_func(ptr))
-            FUNCTIONS::dtor_func(ptr);
-    }
-
-    // This one is needed to prevent variadic ctor to be called
-    // when you want to copy a non-const object.
-    CWrapperNonCopiable(CWrapperNonCopiable& other) = delete;
-    CWrapperNonCopiable(CWrapperNonCopiable const& other) = delete;
-    CWrapperNonCopiable& operator=(CWrapperNonCopiable const& other) = delete;
 };
 
 template<bool condition, typename TRUE_TYPE, typename FALSE_TYPE>
@@ -354,6 +307,16 @@ struct default_validate_func
     }
 };
 
+// this one is never called, but necessary to compile if copy ctor is "deleted"
+template<typename T>
+struct default_copy_func
+{
+    static constexpr T copy_func(T const& other)
+    {
+        return other;
+    }
+};
+
 using E = typename COND< HAS_NESTED_TYPE(F, exception),
     F, default_exception_type>::type;
 using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
@@ -361,14 +324,14 @@ using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
 using V = typename COND< HAS_STATIC_MEMBER(F, validate_func),
     F, default_validate_func<H, D>>::type;
 
+static constexpr bool has_copy_value = HAS_STATIC_MEMBER(F, copy_func);
+using COPY = typename COND< has_copy_value,
+    F, default_copy_func<H>>::type;
+
 public:
 
-    using type = typename COND< HAS_STATIC_MEMBER(F, copy_func),
-        CWrapperBase<H, F, TY, C, E, D, V>,
-        CWrapperNonCopiable<H, F, TY, C, E, D, V>>::type;
+    using type = CWrapperBase<H, F, TY, C, E, D, V, COPY, has_copy_value>;
 };
-
-
 
 template<
     typename HANDLE_T,
