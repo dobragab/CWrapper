@@ -2,7 +2,7 @@
 #define CWRAPPER_HPP_INCLUDED
 
 #include <utility>
-#include <new> // this one is needed only for std::bad_alloc
+#include <exception>
 
 #define HAS_STATIC_MEMBER_DETECTOR(member)                                  \
 template<typename T>                                                        \
@@ -47,6 +47,14 @@ enum class CWrapperType
     Implicit,
     Explicit,
     Get,
+};
+
+struct CWrapperException : public std::exception
+{
+    virtual const char * what() const noexcept override
+    {
+        return "CWrapperException";
+    }
 };
 
 template<
@@ -273,7 +281,7 @@ HAS_STATIC_MEMBER_DETECTOR(validate_func);
 
 struct default_exception_type
 {
-    using exception = std::bad_alloc;
+    using exception = CWrapperException;
 };
 
 template<typename T>
