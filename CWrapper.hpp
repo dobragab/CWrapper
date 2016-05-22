@@ -63,7 +63,6 @@ template<
     bool CONSTSAFE>
 struct ArrowHandler
 { };
-
 template<
     typename PTR_T,
     typename BASE>
@@ -72,7 +71,6 @@ struct ArrowHandler<PTR_T*, BASE, false>
     PTR_T* operator->() const
     {   return static_cast<BASE*>(this)->ptr; }
 };
-
 template<
     typename PTR_T,
     typename BASE>
@@ -84,7 +82,6 @@ struct ArrowHandler<PTR_T*, BASE, true>
     {   return static_cast<const BASE*>(this)->ptr; }
 };
 
-
 template<
     typename HANDLE_T,
     typename BASE,
@@ -92,7 +89,6 @@ template<
     bool CONSTSAFE>
 struct ConversionHandler : public ArrowHandler<HANDLE_T, BASE, CONSTSAFE>
 { };
-
 template<
     typename HANDLE_T,
     typename BASE,
@@ -123,7 +119,6 @@ struct ConversionHandler<HANDLE_T, BASE, CWrapperType::Get, CONSTSAFE>
     HANDLE_T get() const
     {   return static_cast<const BASE*>(this)->ptr; }
 };
-
 template<
     typename PTR_T,
     typename BASE>
@@ -169,11 +164,21 @@ struct hider
 template<bool cond, typename T = void>
 struct enabler
 { };
-
 template<typename T>
 struct enabler<true, T>
 {
     using type = T;
+};
+
+template<bool condition, typename TRUE_TYPE, typename FALSE_TYPE>
+struct COND
+{
+    using type = TRUE_TYPE;
+};
+template<typename TRUE_TYPE, typename FALSE_TYPE>
+struct COND<false, TRUE_TYPE, FALSE_TYPE>
+{
+    using type = FALSE_TYPE;
 };
 
 template<
@@ -203,21 +208,6 @@ class CWrapperBase
 protected:
     HANDLE_T ptr;
 
-private:
-    template<typename DUMMY = void,
-             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
-    CWrapperBase(CWrapperBase const& other, void ** ptr = nullptr) :
-        CWrapperBase{COPY_T::copy_func(other.ptr)}
-    { }
-
-    // This one is needed to prevent variadic ctor to be
-    // called when you want to copy a non-const object.
-    template<typename DUMMY = void,
-             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
-    CWrapperBase(CWrapperBase& other, void ** ptr = nullptr) :
-        CWrapperBase{COPY_T::copy_func(other.ptr)}
-    { }
-
 public:
 
     explicit CWrapperBase(HANDLE_T ptr) :
@@ -241,6 +231,17 @@ public:
         CWrapperBase{COPY_T::copy_func(other.ptr)}
     { }
 
+
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
+    CWrapperBase(CWrapperBase const& other, void ** ptr = nullptr) = delete;
+
+    // This one is needed to prevent variadic ctor to be
+    // called when you want to copy a non-const object.
+    template<typename DUMMY = void,
+             typename = typename enabler<hider<!HAS_COPY, DUMMY>::value>::type>
+    CWrapperBase(CWrapperBase& other, void ** ptr = nullptr) = delete;
+
     template<typename... ARGS>
     explicit CWrapperBase(ARGS&&... args) :
         CWrapperBase{FUNCTIONS::ctor_func(std::forward<ARGS>(args)...)}
@@ -263,18 +264,6 @@ public:
         std::swap(ptr, other.ptr);
         return *this;
     }
-};
-
-template<bool condition, typename TRUE_TYPE, typename FALSE_TYPE>
-struct COND
-{
-    using type = TRUE_TYPE;
-};
-
-template<typename TRUE_TYPE, typename FALSE_TYPE>
-struct COND<false, TRUE_TYPE, FALSE_TYPE>
-{
-    using type = FALSE_TYPE;
 };
 
 HAS_NESTED_TYPE_DETECTOR(exception);
@@ -307,7 +296,7 @@ struct default_validate_func
     }
 };
 
-// this one is never called, but necessary to compile if copy ctor is "deleted"
+// this one is never called, but necessary to compile if copy ctor is deleted
 template<typename T>
 struct default_copy_func
 {
@@ -324,13 +313,12 @@ using D = typename COND< HAS_STATIC_MEMBER(F, invalid_value),
 using V = typename COND< HAS_STATIC_MEMBER(F, validate_func),
     F, default_validate_func<H, D>>::type;
 
-static constexpr bool has_copy_value = HAS_STATIC_MEMBER(F, copy_func);
-using COPY = typename COND< has_copy_value,
+using COPY = typename COND< HAS_STATIC_MEMBER(F, copy_func),
     F, default_copy_func<H>>::type;
 
 public:
 
-    using type = CWrapperBase<H, F, TY, C, E, D, V, COPY, has_copy_value>;
+    using type = CWrapperBase<H, F, TY, C, E, D, V, COPY, HAS_STATIC_MEMBER(F, copy_func)>;
 };
 
 template<
