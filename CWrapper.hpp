@@ -77,7 +77,7 @@ template<
 struct ArrowHandler<PTR_T*, BASE, false>
 {
     PTR_T* operator->() const
-    {   return static_cast<BASE*>(this)->ptr; }
+    {   return static_cast<const BASE*>(this)->ptr; }
 };
 template<
     typename PTR_T,
@@ -207,7 +207,7 @@ class CWrapperBase
         TYPE,
         CONSTSAFE>
 {
-    friend class ConversionHandler<
+    friend ConversionHandler<
         HANDLE_T,
         CWrapperBase<HANDLE_T, FUNCTIONS, TYPE, CONSTSAFE, EXCEPTION_T,
                      INVALID_T, VALIDATE_T, COPY_T, HAS_COPY>,
